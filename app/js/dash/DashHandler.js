@@ -28,8 +28,22 @@ Dash.dependencies.DashHandler = function () {
         },
 
         replaceNumberForTemplate = function (url, value) {
-            var v = value.toString();
-            return url.split("$Number$").join(v);
+            var w,
+            matches,
+            v = value.toString(),
+            re = /\$Number(:?%0(\d{1,2})d)?\$/;
+            matches = url.match(re);
+            if (matches) {
+                if(matches.length > 1) {
+                    w = parseInt(matches[2], 10);
+                    while(v.length < w) {
+                        v = "0"+v;
+                    }
+                }
+                return url.replace(re, v);
+            } else {
+                return url;
+            }
         },
 
         replaceTimeForTemplate = function (url, value) {
