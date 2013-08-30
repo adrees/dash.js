@@ -1,14 +1,14 @@
 /*
  * The copyright in this software is being made available under the BSD License, included below. This software may be subject to other third party and contributor rights, including patent rights, and no such rights are granted under this license.
- * 
+ *
  * Copyright (c) 2013, Digital Primates
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
  * •  Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
  * •  Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
  * •  Neither the name of the Digital Primates nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS “AS IS” AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 Dash.dependencies.DashManifestExtensions = function () {
@@ -102,7 +102,7 @@ Dash.dependencies.DashManifestExtensions.prototype = {
         return Q.when(result);
     },
 
-    getIsMain: function (adaptation) {
+    getIsMain: function (/*adaptation*/) {
         "use strict";
         // TODO : Check "Role" node.
         // TODO : Use this somewhere.
@@ -120,10 +120,9 @@ Dash.dependencies.DashManifestExtensions.prototype = {
         return adaptation;
     },
 
-    getDataForId: function (id, manifest) {
+    getDataForId: function (id, manifest, periodIndex) {
         "use strict";
-        var self = this,
-            adaptations = manifest.Period_asArray[0].AdaptationSet_asArray,
+        var adaptations = manifest.Period_asArray[periodIndex].AdaptationSet_asArray,
             i,
             len;
 
@@ -136,19 +135,17 @@ Dash.dependencies.DashManifestExtensions.prototype = {
         return Q.when(null);
     },
 
-    getDataForIndex: function (index, manifest) {
+    getDataForIndex: function (index, manifest, periodIndex) {
         "use strict";
-        var self = this,
-            adaptations = manifest.Period_asArray[0].AdaptationSet_asArray;
+        var adaptations = manifest.Period_asArray[periodIndex].AdaptationSet_asArray;
 
         return Q.when(adaptations[index]);
     },
 
-    getDataIndex: function (data, manifest) {
+    getDataIndex: function (data, manifest, periodIndex) {
         "use strict";
 
-        var self = this,
-            adaptations = manifest.Period_asArray[0].AdaptationSet_asArray,
+        var adaptations = manifest.Period_asArray[periodIndex].AdaptationSet_asArray,
             i,
             len;
 
@@ -161,12 +158,12 @@ Dash.dependencies.DashManifestExtensions.prototype = {
         return Q.when(-1);
     },
 
-    getVideoData: function (manifest) {
+    getVideoData: function (manifest, periodIndex) {
         "use strict";
         //return Q.when(null);
         //------------------------------------
         var self = this,
-            adaptations = manifest.Period_asArray[0].AdaptationSet_asArray,
+            adaptations = manifest.Period_asArray[periodIndex].AdaptationSet_asArray,
             i,
             len,
             deferred = Q.defer(),
@@ -193,12 +190,12 @@ Dash.dependencies.DashManifestExtensions.prototype = {
         return deferred.promise;
     },
 
-    getAudioDatas: function (manifest) {
+    getAudioDatas: function (manifest, periodIndex) {
         "use strict";
         //return Q.when(null);
         //------------------------------------
         var self = this,
-            adaptations = manifest.Period_asArray[0].AdaptationSet_asArray,
+            adaptations = manifest.Period_asArray[periodIndex].AdaptationSet_asArray,
             i,
             len,
             deferred = Q.defer(),
@@ -223,7 +220,7 @@ Dash.dependencies.DashManifestExtensions.prototype = {
         return deferred.promise;
     },
 
-    getPrimaryAudioData: function (manifest) {
+    getPrimaryAudioData: function (manifest, periodIndex) {
         "use strict";
         var i,
             len,
@@ -231,7 +228,7 @@ Dash.dependencies.DashManifestExtensions.prototype = {
             funcs = [],
             self = this;
 
-        this.getAudioDatas(manifest).then(
+        this.getAudioDatas(manifest, periodIndex).then(
             function (datas) {
                 if (!datas || datas.length === 0) {
                     deferred.resolve(null);
@@ -268,6 +265,23 @@ Dash.dependencies.DashManifestExtensions.prototype = {
         return Q.when(codec);
     },
 
+    getKID: function (data) {
+        "use strict";
+
+        if (!data || !data.hasOwnProperty("cenc:default_KID")) {
+            return null;
+        }
+        return data["cenc:default_KID"];
+    },
+
+    getContentProtectionData: function (data) {
+        "use strict";
+        if (!data || !data.hasOwnProperty("ContentProtection_asArray") || data.ContentProtection_asArray.length === 0) {
+            return Q.when(null);
+        }
+        return Q.when(data.ContentProtection_asArray);
+    },
+
     getSegmentInfoFor: function (representation) {
         if (representation.hasOwnProperty("SegmentBase")) {
             return representation.SegmentBase;
@@ -294,16 +308,18 @@ Dash.dependencies.DashManifestExtensions.prototype = {
         return Q.when(delay);
     },
 
-    getLiveStart: function (manifest) {
+    getLiveStart: function (manifest, periodIndex) {
         var time = 0,
             fStart = 1,
             fDuration,
             fTimescale = 1,
-            representation;
+            representation,
+            list = null,
+            template = null;
 
         // We don't really care what representation we use; they should all start at the same time.
         // Just grab the first representation; if this isn't there, we have bigger problems.
-        representation = manifest.Period_asArray[0].AdaptationSet_asArray[1].Representation_asArray[0];
+        representation = manifest.Period_asArray[periodIndex].AdaptationSet_asArray[1].Representation_asArray[0];
 
         if (representation.hasOwnProperty("SegmentList")) {
             list = representation.SegmentList;
@@ -342,18 +358,14 @@ Dash.dependencies.DashManifestExtensions.prototype = {
         return Q.when(time);
     },
 
-    getLiveEdge: function (manifest) {
+    getLiveEdge: function (manifest, periodIndex) {
         "use strict";
         var self = this,
             deferred = Q.defer(),
             liveOffset = 0,
             now = new Date(),
             start = manifest.availabilityStartTime,
-            end,
-            representation,
-            list,
-            template,
-            timeline;
+            end;
 
         self.getLiveOffset(manifest).then(
             function (delay) {
@@ -367,7 +379,7 @@ Dash.dependencies.DashManifestExtensions.prototype = {
                 }
 
                 // Find out the between stream start and available start time.
-                self.getLiveStart(manifest).then(
+                self.getLiveStart(manifest, periodIndex).then(
                     function (start) {
                         // get the full time, relative to stream start
                         liveOffset += start;
@@ -384,7 +396,7 @@ Dash.dependencies.DashManifestExtensions.prototype = {
         return deferred.promise;
     },
 
-    getPresentationOffset: function (manifest) {
+    getPresentationOffset: function (manifest, periodIndex) {
         var time = 0,
             offset,
             timescale = 1,
@@ -400,10 +412,10 @@ Dash.dependencies.DashManifestExtensions.prototype = {
         // The stream without content will force the player to stall because it thinks it's waiting
         // for data.  This will have to be fixed on the BufferController.
         // For now let's assume that the presentationTimeOffset is the same between all representations.
-        representation = manifest.Period_asArray[0].AdaptationSet_asArray[0].Representation_asArray[0];
+        representation = manifest.Period_asArray[periodIndex].AdaptationSet_asArray[0].Representation_asArray[0];
         segmentInfo = this.getSegmentInfoFor(representation);
 
-        if (segmentInfo.hasOwnProperty("presentationTimeOffset")) {
+        if (segmentInfo !== null && segmentInfo !== undefined && segmentInfo.hasOwnProperty("presentationTimeOffset")) {
             offset = segmentInfo.presentationTimeOffset;
 
             if (segmentInfo.hasOwnProperty("timescale")) {
@@ -455,6 +467,27 @@ Dash.dependencies.DashManifestExtensions.prototype = {
         return Q.when(dur);
     },
 
+    getDurationForPeriod: function (periodIndex, manifest, isLive) {
+        "use strict";
+        var dur = NaN;
+
+        if (isLive) {
+            dur = Number.POSITIVE_INFINITY;
+        } else {
+
+            if(manifest.Period_asArray.length > 1 && manifest.Period_asArray[periodIndex].duration !== undefined)
+            {
+                dur = manifest.Period_asArray[periodIndex].duration;
+            } else if (manifest.mediaPresentationDuration) {
+                dur = manifest.mediaPresentationDuration;
+            } else if (manifest.availabilityEndTime && manifest.availabilityStartTime) {
+                dur = (manifest.availabilityEndTime.getTime() - manifest.availabilityStartTime.getTime());
+            }
+        }
+
+        return Q.when(dur);
+    },
+
     getBandwidth: function (representation) {
         "use strict";
         return Q.when(representation.bandwidth);
@@ -479,5 +512,72 @@ Dash.dependencies.DashManifestExtensions.prototype = {
     getRepresentationFor: function (index, data) {
         "use strict";
         return Q.when(data.Representation_asArray[index]);
+    },
+
+    getPeriodCount: function (manifest) {
+        "use strict";
+        return Q.when(manifest.Period_asArray.length);
+    },
+
+    getTimestampOffsetForPeriod: function (periodIndex, manifest, isLive) {
+        var self = this;
+        return self.getStartOffsetForPeriod(manifest, periodIndex).then(
+            function (time) {
+                var startTime = manifest.Period_asArray[periodIndex].start;
+                if (typeof(startTime) !== "undefined") {
+                    return Q.when(manifest.Period_asArray[periodIndex].start - time);
+                } else {
+                    var deferredDurations = [],
+                        defferedOffset = Q.defer();
+
+                    for(var i = 0; i < periodIndex; i++) {
+                        deferredDurations.push(self.getDurationForPeriod(i, manifest, isLive));
+                    }
+
+                    Q.all(deferredDurations).then(
+                        function(durationResult) {
+                            if(durationResult) {
+                                var offset = 0;
+                                for (var j = 0, ln = durationResult.length; j < ln; j++) {
+                                    offset += durationResult[j];
+                                }
+                                defferedOffset.resolve(offset - time);
+                            } else {
+                                defferedOffset.reject("Error calculating timestamp offset for period");
+                            }
+                        }
+                    );
+
+                    return defferedOffset.promise;
+                }
+            }
+        );
+    },
+
+    getStartOffsetForPeriod: function (manifest, periodIndex) {
+        var self = this,
+            periodArray = manifest.Period_asArray,
+            period = periodArray[periodIndex],
+            time = 0,
+            defer,
+            idx;
+
+        for (idx = 0; idx < periodIndex; idx++) {
+            if (period.hasOwnProperty("BaseURL") && (periodArray[idx].BaseURL == period.BaseURL)) {
+                defer = Q.defer();
+                Q.all([self.getLiveStart(manifest, idx), self.getLiveStart(manifest, periodIndex)]).then(
+                    function (liveStartResults) {
+                        if (typeof(liveStartResults) !== "undefined" && !isNaN(liveStartResults[0] && !isNaN(liveStartResults[0]))) {
+                            time = Math.abs(liveStartResults[0] - liveStartResults[1]);
+                        }
+
+                        defer.resolve(time);
+                    }
+                );
+                break;
+            }
+        }
+
+        return Q.when(defer ? defer.promise : time);
     }
 };

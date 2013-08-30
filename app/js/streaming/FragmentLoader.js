@@ -20,36 +20,52 @@ MediaPlayer.dependencies.FragmentLoader = function () {
 
         loadNext = function () {
             var req = new XMLHttpRequest(),
-                httpRequestMetrics = new MediaPlayer.vo.metrics.HTTPRequest(),
+                httpRequestMetrics = null,
+                firstProgress = true,
                 loaded = false,
                 self = this;
 
             if (requests.length > 0) {
                 lastRequest = requests.shift();
                 lastRequest.requestStartDate = new Date();
+                lastRequest.firstByteDate = lastRequest.requestStartDate;
                 loading = true;
 
-                req.responseType = "arraybuffer";
                 req.open("GET", lastRequest.url, true);
+                req.responseType = "arraybuffer";
+/*
+                req.setRequestHeader("Cache-Control", "no-cache");
+                req.setRequestHeader("Pragma", "no-cache");
+                req.setRequestHeader("If-Modified-Since", "Sat, 1 Jan 2000 00:00:00 GMT");
+*/
                 if (lastRequest.range) {
                     req.setRequestHeader("Range", "bytes=" + lastRequest.range);
                 }
 
-                req.onloadend = function (e) {
-                    if (!loaded) {
-                        lastRequest.deferred.reject("Error loading fragment.");
+                req.onprogress = function (event) {
+                    if (firstProgress) {
+                        firstProgress = false;
+                        if (!event.lengthComputable || (event.lengthComputable && event.total != event.loaded)) {
+                            lastRequest.firstByteDate = new Date();
+                        }
                     }
                 };
 
-                req.onload = function (e) {
+                req.onload = function () {
+                    if (req.status < 200 || req.status > 299)
+                    {
+                      return;
+                    }
                     loaded = true;
+                    lastRequest.requestEndDate = new Date();
 
-                    var entry = new MediaPlayer.vo.metrics.HTTPRequest.Trace(),
-                        currentTime = new Date(),
-                        bytes = req.response;
+                    var currentTime = lastRequest.requestEndDate,
+                        bytes = req.response,
+                        latency = (lastRequest.firstByteDate.getTime() - lastRequest.requestStartDate.getTime()),
+                        download = (lastRequest.requestEndDate.getTime() - lastRequest.firstByteDate.getTime()),
+                        total = (lastRequest.requestEndDate.getTime() - lastRequest.requestStartDate.getTime());
 
-                    entry.s = currentTime;
-                    lastRequest.requestEndDate = currentTime;
+                    self.debug.log("segment loaded: (" + req.status + ", " + latency + "ms, " + download + "ms, " + total + "ms) " + lastRequest.url);
 
                     httpRequestMetrics = self.metricsModel.addHttpRequest(lastRequest.streamType,
                                                                           null,
@@ -58,6 +74,7 @@ MediaPlayer.dependencies.FragmentLoader = function () {
                                                                           null,
                                                                           lastRequest.range,
                                                                           lastRequest.requestStartDate,
+                                                                          lastRequest.firstByteDate,
                                                                           lastRequest.requestEndDate,
                                                                           req.status,
                                                                           null,
@@ -80,7 +97,20 @@ MediaPlayer.dependencies.FragmentLoader = function () {
                     loadNext.call(self);
                 };
 
-                req.onerror = function (e) {
+                req.onloadend = req.onerror = function () {
+                    if (loaded)
+                    {
+                      return;
+                    }
+
+                    lastRequest.requestEndDate = new Date();
+
+                    var latency = (lastRequest.firstByteDate.getTime() - lastRequest.requestStartDate.getTime()),
+                        download = (lastRequest.requestEndDate.getTime() - lastRequest.firstByteDate.getTime()),
+                        total = (lastRequest.requestEndDate.getTime() - lastRequest.requestStartDate.getTime());
+
+                    self.debug.log("segment loaded: (" + req.status + ", " + latency + "ms, " + download + "ms, " + total + "ms) " + lastRequest.url);
+
                     httpRequestMetrics = self.metricsModel.addHttpRequest(lastRequest.streamType,
                                                                           null,
                                                                           lastRequest.type,
@@ -88,11 +118,14 @@ MediaPlayer.dependencies.FragmentLoader = function () {
                                                                           null,
                                                                           lastRequest.range,
                                                                           lastRequest.requestStartDate,
-                                                                          new Date(),
+                                                                          lastRequest.firstByteDate,
+                                                                          lastRequest.requestEndDate,
                                                                           req.status,
                                                                           null,
                                                                           lastRequest.duration);
                     lastRequest.deferred.reject("Error loading fragment.");
+
+                    loadNext.call(self);
                 };
 
                 req.send();
@@ -117,6 +150,7 @@ MediaPlayer.dependencies.FragmentLoader = function () {
 
     return {
         metricsModel: undefined,
+        debug: undefined,
 
         getLoading: function () {
             return loading;

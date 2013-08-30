@@ -191,7 +191,7 @@ Dash.dependencies.BaseURLExtensions = function () {
 
                 request = new XMLHttpRequest();
 
-                request.onloadend = function (e) {
+                request.onloadend = function () {
                     if (!loaded) {
                         deferred.reject("Error loading initialization.");
                     }
@@ -211,8 +211,8 @@ Dash.dependencies.BaseURLExtensions = function () {
                     deferred.reject("Error loading initialization.");
                 };
 
-                request.responseType = "arraybuffer";
                 request.open("GET", info.url);
+                request.responseType = "arraybuffer";
                 request.setRequestHeader("Range", "bytes=" + info.range.start + "-" + info.range.end);
                 request.send(null);
             } else {
@@ -247,7 +247,7 @@ Dash.dependencies.BaseURLExtensions = function () {
             info.range.start = 0;
             info.range.end = info.bytesToLoad;
 
-            request.onloadend = function (e) {
+            request.onloadend = function () {
                 if (!loaded) {
                     deferred.reject("Error finding initialization.");
                 }
@@ -267,8 +267,8 @@ Dash.dependencies.BaseURLExtensions = function () {
                 deferred.reject("Error finding initialization.");
             };
 
-            request.responseType = "arraybuffer";
             request.open("GET", info.url);
+            request.responseType = "arraybuffer";
             request.setRequestHeader("Range", "bytes=" + info.range.start + "-" + info.range.end);
             request.send(null);
             self.debug.log("Perform init search: " + info.url);
@@ -285,6 +285,8 @@ Dash.dependencies.BaseURLExtensions = function () {
                 size = 0,
                 bytesAvailable,
                 sidxBytes,
+                sidxSlice,
+                sidxOut,
                 i,
                 c,
                 loaded = false,
@@ -331,7 +333,7 @@ Dash.dependencies.BaseURLExtensions = function () {
                 info.range.start = 0;
                 info.range.end = info.bytesLoaded + (size - bytesAvailable);
 
-                request.onloadend = function (e) {
+                request.onloadend = function () {
                     if (!loaded) {
                         deferred.reject("Error loading sidx.");
                     }
@@ -351,8 +353,8 @@ Dash.dependencies.BaseURLExtensions = function () {
                     deferred.reject("Error loading sidx.");
                 };
 
-                request.responseType = "arraybuffer";
                 request.open("GET", info.url);
+                request.responseType = "arraybuffer";
                 request.setRequestHeader("Range", "bytes=" + info.range.start + "-" + info.range.end);
                 request.send(null);
             } else {
@@ -362,7 +364,11 @@ Dash.dependencies.BaseURLExtensions = function () {
                 info.range.end = info.range.start + size;
 
                 self.debug.log("Found the SIDX box.  Start: " + info.range.start + " | End: " + info.range.end);
-                sidxBytes = data.slice(info.range.start, info.range.end);
+//                sidxBytes = data.slice(info.range.start, info.range.end);
+                sidxBytes = new ArrayBuffer(info.range.end - info.range.start);
+                sidxOut = new Uint8Array(sidxBytes);
+                sidxSlice = new Uint8Array(data, info.range.start, info.range.end - info.range.start);
+                sidxOut.set(sidxSlice);
 
                 parsed = this.parseSIDX.call(this, sidxBytes, info.range.start);
 
@@ -440,7 +446,7 @@ Dash.dependencies.BaseURLExtensions = function () {
                 info.range.end = parseFloat(parts[1]);
             }
 
-            request.onloadend = function (e) {
+            request.onloadend = function () {
                 if (!loaded) {
                     deferred.reject("Error loading sidx.");
                 }
@@ -471,8 +477,8 @@ Dash.dependencies.BaseURLExtensions = function () {
                 deferred.reject("Error loading sidx.");
             };
 
-            request.responseType = "arraybuffer";
             request.open("GET", info.url);
+            request.responseType = "arraybuffer";
             request.setRequestHeader("Range", "bytes=" + info.range.start + "-" + info.range.end);
             request.send(null);
             self.debug.log("Perform SIDX load: " + info.url);

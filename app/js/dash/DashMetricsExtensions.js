@@ -1,14 +1,14 @@
 /*
  * The copyright in this software is being made available under the BSD License, included below. This software may be subject to other third party and contributor rights, including patent rights, and no such rights are granted under this license.
- * 
+ *
  * Copyright (c) 2013, Digital Primates
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
  * •  Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
  * •  Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
  * •  Neither the name of the Digital Primates nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS “AS IS” AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 Dash.dependencies.DashMetricsExtensions = function () {
@@ -70,37 +70,28 @@ Dash.dependencies.DashMetricsExtensions = function () {
         },
 
         adaptationIsType = function (adaptation, bufferType) {
-            var contentType,
-                contentComponent,
+            var found = false;
+
+            if (bufferType === "video") {
+                found = this.manifestExt.getIsVideo(adaptation);
+            }
+            else if (bufferType === "audio") {
+                found = this.manifestExt.getIsAudio(adaptation); // TODO : Have to be sure it's the *active* audio track.
+            }
+            else {
                 found = false;
-
-            if (adaptation.hasOwnProperty("mimeType")) {
-                contentType = adaptation.mimeType;
-            } else if (adaptation.hasOwnProperty("ContentComponent")) {
-                contentComponent = adaptation.ContentComponent;
-                contentType = contentComponent.contentType;
             }
 
-            if (contentType !== undefined && contentType !== null) {
-                contentType = contentType.toLowerCase();
-
-                if (bufferType !== undefined && bufferType !== null) 
-                    bufferType = bufferType.toLowerCase();
-
-                if (contentType.indexOf(bufferType) !== -1) 
-                    found = true;
-
-            }
             return found;
         },
 
         findMaxBufferIndex = function (periodArray, bufferType) {
             var period,
-            adaptationSet,
-            adaptationSetArray,
-            representationArray,
-            periodArrayIndex,
-            adaptationSetArrayIndex;
+                adaptationSet,
+                adaptationSetArray,
+                representationArray,
+                periodArrayIndex,
+                adaptationSetArrayIndex;
 
             for (periodArrayIndex = 0; periodArrayIndex < periodArray.length; periodArrayIndex = periodArrayIndex + 1) {
                 period = periodArray[periodArrayIndex];
@@ -108,7 +99,7 @@ Dash.dependencies.DashMetricsExtensions = function () {
                 for (adaptationSetArrayIndex = 0; adaptationSetArrayIndex < adaptationSetArray.length; adaptationSetArrayIndex = adaptationSetArrayIndex + 1) {
                     adaptationSet = adaptationSetArray[adaptationSetArrayIndex];
                     representationArray = adaptationSet.Representation_asArray;
-                    if (adaptationIsType(adaptationSet, bufferType)) {
+                    if (adaptationIsType.call(this, adaptationSet, bufferType)) {
                         return representationArray.length;
                     }
                 }
@@ -119,9 +110,9 @@ Dash.dependencies.DashMetricsExtensions = function () {
 
         getBandwidthForRepresentation = function (representationId) {
             var self = this,
-            manifest = self.manifestModel.getValue(),
-            representation,
-            periodArray = manifest.Period_asArray;
+                manifest = self.manifestModel.getValue(),
+                representation,
+                periodArray = manifest.Period_asArray;
 
             representation = findRepresentionInPeriodArray.call(self, periodArray, representationId);
 
@@ -134,9 +125,9 @@ Dash.dependencies.DashMetricsExtensions = function () {
 
         getIndexForRepresentation = function (representationId) {
             var self = this,
-            manifest = self.manifestModel.getValue(),
-            representationIndex,
-            periodArray = manifest.Period_asArray;
+                manifest = self.manifestModel.getValue(),
+                representationIndex,
+                periodArray = manifest.Period_asArray;
 
             representationIndex = findRepresentationIndexInPeriodArray.call(self, periodArray, representationId);
             return representationIndex;
@@ -144,11 +135,11 @@ Dash.dependencies.DashMetricsExtensions = function () {
 
         getMaxIndexForBufferType = function (bufferType) {
             var self = this,
-            manifest = self.manifestModel.getValue(),
-            maxIndex,
-            periodArray = manifest.Period_asArray;
+                manifest = self.manifestModel.getValue(),
+                maxIndex,
+                periodArray = manifest.Period_asArray;
 
-            maxIndex = findMaxBufferIndex(periodArray, bufferType);
+            maxIndex = findMaxBufferIndex.call(this, periodArray, bufferType);
             return maxIndex;
         },
 
@@ -235,13 +226,14 @@ Dash.dependencies.DashMetricsExtensions = function () {
 
     return {
         manifestModel: undefined,
-            getBandwidthForRepresentation : getBandwidthForRepresentation,
-            getIndexForRepresentation : getIndexForRepresentation,
-            getMaxIndexForBufferType : getMaxIndexForBufferType,
-            getCurrentRepresentationSwitch : getCurrentRepresentationSwitch,
-            getCurrentBufferLevel : getCurrentBufferLevel,
-            getCurrentHttpRequest : getCurrentHttpRequest,
-            getCurrentDroppedFrames : getCurrentDroppedFrames
+        manifestExt: undefined,
+        getBandwidthForRepresentation : getBandwidthForRepresentation,
+        getIndexForRepresentation : getIndexForRepresentation,
+        getMaxIndexForBufferType : getMaxIndexForBufferType,
+        getCurrentRepresentationSwitch : getCurrentRepresentationSwitch,
+        getCurrentBufferLevel : getCurrentBufferLevel,
+        getCurrentHttpRequest : getCurrentHttpRequest,
+        getCurrentDroppedFrames : getCurrentDroppedFrames
     };
 };
 

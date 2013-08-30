@@ -1,14 +1,14 @@
 /*
  * The copyright in this software is being made available under the BSD License, included below. This software may be subject to other third party and contributor rights, including patent rights, and no such rights are granted under this license.
- * 
+ *
  * Copyright (c) 2013, Digital Primates
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
  * •  Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
  * •  Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
  * •  Neither the name of the Digital Primates nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS “AS IS” AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 Dash.dependencies.DashHandler = function () {
@@ -101,7 +101,7 @@ Dash.dependencies.DashHandler = function () {
                         request.range = theRange;
                         deferred.resolve(request);
                     },
-                    function (err) {
+                    function () {
                         //alert("Error loading initialization.");
                         self.errHandler.downloadError("Error loading initialization.");
                     }
@@ -126,6 +126,8 @@ Dash.dependencies.DashHandler = function () {
                 fTimescale,
                 fLength,
                 sDuration,
+                startNumber,
+                idx,
                 isFinished = false;
 
             this.debug.log("Checking for stream end...");
@@ -138,6 +140,7 @@ Dash.dependencies.DashHandler = function () {
                 isFinished = (index >= representation.segments.length);
             } else if (representation.hasOwnProperty("SegmentTemplate") && !representation.SegmentTemplate.hasOwnProperty("SegmentTimeline")) {
                 fTimescale = 1;
+                startNumber = 1;
                 sDuration = Math.floor(duration); // Disregard fractional seconds.  TODO : Is this ok?  The logic breaks if we don't do this...
 
                 if (representation.SegmentTemplate.hasOwnProperty("duration")) {
@@ -147,9 +150,14 @@ Dash.dependencies.DashHandler = function () {
                         fTimescale = representation.SegmentTemplate.timescale;
                     }
 
+                    if (representation.SegmentTemplate.hasOwnProperty("startNumber")) {
+                        startNumber = representation.SegmentTemplate.startNumber;
+                    }
+
                     fLength = (fDuration / fTimescale);
-                    this.debug.log("SegmentTemplate: " + fLength + " * " + index + " = " + (fLength * index) + " / " + sDuration);
-                    isFinished = ((fLength * index) >= sDuration);
+                    idx = index - startNumber;
+                    this.debug.log("SegmentTemplate: " + fLength + " * " + idx + " = " + (fLength * idx) + " / " + sDuration);
+                    isFinished = ((fLength * idx) >= sDuration);
                 }
             }
 
@@ -166,11 +174,17 @@ Dash.dependencies.DashHandler = function () {
                 repeat,
                 seg,
                 time = 0,
-                count = 0,
+                count = 1,
+                fTimescale = 1,
                 url;
 
             if (template.hasOwnProperty("startNumber")) {
                 count = template.startNumber;
+            }
+
+            // default to 1 if not present
+            if (template.hasOwnProperty("timescale")) {
+                fTimescale = template.timescale;
             }
 
             fragments = timeline.S_asArray;
@@ -184,7 +198,7 @@ Dash.dependencies.DashHandler = function () {
                 for (j = 0; j <= repeat; j += 1) {
                     seg = new Dash.vo.Segment();
 
-                    seg.timescale = template.timescale;
+                    seg.timescale = fTimescale;
                     if (frag.hasOwnProperty("t")) {
                         seg.startTime = frag.t;
                         time = frag.t;
@@ -245,8 +259,7 @@ Dash.dependencies.DashHandler = function () {
 
         getSegmentsFromSource = function (representation) {
             var url = representation.BaseURL,
-                range = null,
-                manifest = this.manifestModel.getValue();
+                range = null;
 
             if (representation.hasOwnProperty("SegmentBase")) {
                 if (representation.SegmentBase.hasOwnProperty("indexRange")) {
@@ -286,8 +299,7 @@ Dash.dependencies.DashHandler = function () {
                 frag,
                 ft,
                 fd,
-                i,
-                len;
+                i;
 
             if (segments && segments.length > 0) {
                 for (i = segments.length - 1; i >= 0; i--) {
@@ -335,6 +347,7 @@ Dash.dependencies.DashHandler = function () {
             var idx = -1,
                 fDuration,
                 fTimescale = 1,
+                startNumber = 1, // SegmentTemplate offset controlled by @startNumber attribute or 1 by default
                 dur;
 
             if (template.hasOwnProperty("duration")) {
@@ -348,10 +361,14 @@ Dash.dependencies.DashHandler = function () {
                 fTimescale = template.timescale;
             }
 
+            if (template.hasOwnProperty("startNumber")) {
+                startNumber = template.startNumber;
+            }
+
             dur = (fDuration / fTimescale);
             idx = Math.floor(time / dur);
 
-            idx += 1; // SegmentTemplate starts at 1, not zero, so apply that offset here.
+            idx += startNumber; // apply first item offset
 
             return Q.when(idx);
         },
@@ -359,12 +376,15 @@ Dash.dependencies.DashHandler = function () {
         getRequestForTemplate = function (index, template, representation) {
             var request = new MediaPlayer.vo.SegmentRequest(),
                 url,
+                fTimescale = 1,
                 time;
 
-            time = (template.duration * index);
+            // default to 1 if not present
             if (template.hasOwnProperty("timescale")) {
-                time = time / template.timescale;
+                fTimescale = template.timescale;
             }
+
+            time = (template.duration * index) / fTimescale;
             time = Math.floor(time);
 
             url = template.media;
@@ -377,9 +397,9 @@ Dash.dependencies.DashHandler = function () {
             request.streamType = type;
             request.type = "Media Segment";
             request.url = getRequestUrl(url, representation.BaseURL);
-            request.duration = template.duration / template.timescale;
-            request.timescale = template.timescale;
-            request.startTime = (index * template.duration) / template.timescale;
+            request.duration = template.duration / fTimescale;
+            request.timescale = fTimescale;
+            request.startTime = (index * template.duration) / fTimescale;
 
             return Q.when(request);
         },
@@ -595,7 +615,7 @@ Dash.dependencies.DashHandler = function () {
 
                     deferred.resolve(time);
                 }
-            )
+            );
 
             return deferred.promise;
         };
@@ -603,7 +623,6 @@ Dash.dependencies.DashHandler = function () {
     return {
         debug: undefined,
         baseURLExt: undefined,
-        sonyExt: undefined,
         manifestModel: undefined,
         errHandler: undefined,
 
